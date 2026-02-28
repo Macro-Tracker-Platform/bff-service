@@ -10,7 +10,7 @@ import lombok.Data;
 @Schema(description = "Nutritional values for food intake")
 public class NutrimentsDto {
     @Schema(
-            description = "Calories content",
+            description = "Total calories",
             example = "165.5",
             type = "number",
             format = "decimal"
@@ -19,7 +19,16 @@ public class NutrimentsDto {
     private BigDecimal calories = BigDecimal.ZERO;
 
     @Schema(
-            description = "Fat content in grams",
+            description = "Total carbohydrates",
+            example = "12.0",
+            type = "number",
+            format = "decimal"
+    )
+    @JsonSerialize(using = BigDecimalJsonSerializer.class)
+    private BigDecimal carbohydrates = BigDecimal.ZERO;
+
+    @Schema(
+            description = "Total fat",
             example = "3.2",
             type = "number",
             format = "decimal"
@@ -28,7 +37,7 @@ public class NutrimentsDto {
     private BigDecimal fat = BigDecimal.ZERO;
 
     @Schema(
-            description = "Protein content in grams",
+            description = "Total protein",
             example = "31.0",
             type = "number",
             format = "decimal"
@@ -37,11 +46,74 @@ public class NutrimentsDto {
     private BigDecimal protein = BigDecimal.ZERO;
 
     @Schema(
-            description = "Carbohydrates content in grams",
-            example = "0.0",
+            description = "Calories per piece",
+            example = "165.5",
             type = "number",
             format = "decimal"
     )
     @JsonSerialize(using = BigDecimalJsonSerializer.class)
-    private BigDecimal carbohydrates = BigDecimal.ZERO;
+    private BigDecimal caloriesPerPiece = BigDecimal.ZERO;
+
+    @Schema(
+            description = "Carbohydrates per piece",
+            example = "12.0",
+            type = "number",
+            format = "decimal"
+    )
+    @JsonSerialize(using = BigDecimalJsonSerializer.class)
+    private BigDecimal carbohydratesPerPiece = BigDecimal.ZERO;
+
+    @Schema(
+            description = "Fat per piece",
+            example = "3.2",
+            type = "number",
+            format = "decimal"
+    )
+    @JsonSerialize(using = BigDecimalJsonSerializer.class)
+    private BigDecimal fatPerPiece = BigDecimal.ZERO;
+
+    @Schema(
+            description = "Protein per piece",
+            example = "31.0",
+            type = "number",
+            format = "decimal"
+    )
+    @JsonSerialize(using = BigDecimalJsonSerializer.class)
+    private BigDecimal proteinPerPiece = BigDecimal.ZERO;
+
+    @Schema(
+            description = "Calories per 100g",
+            example = "165.5",
+            type = "number",
+            format = "decimal"
+    )
+    @JsonSerialize(using = BigDecimalJsonSerializer.class)
+    private BigDecimal caloriesPer100 = BigDecimal.ZERO;
+
+    @Schema(
+            description = "Carbohydrates per 100g",
+            example = "12.0",
+            type = "number",
+            format = "decimal"
+    )
+    @JsonSerialize(using = BigDecimalJsonSerializer.class)
+    private BigDecimal carbohydratesPer100 = BigDecimal.ZERO;
+
+    @Schema(
+            description = "Fat per 100g",
+            example = "3.2",
+            type = "number",
+            format = "decimal"
+    )
+    @JsonSerialize(using = BigDecimalJsonSerializer.class)
+    private BigDecimal fatPer100 = BigDecimal.ZERO;
+
+    @Schema(
+            description = "Protein per 100g",
+            example = "31.0",
+            type = "number",
+            format = "decimal"
+    )
+    @JsonSerialize(using = BigDecimalJsonSerializer.class)
+    private BigDecimal proteinPer100 = BigDecimal.ZERO;
 }
