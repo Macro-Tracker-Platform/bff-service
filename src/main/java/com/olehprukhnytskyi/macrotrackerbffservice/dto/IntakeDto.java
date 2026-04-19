@@ -1,6 +1,7 @@
 package com.olehprukhnytskyi.macrotrackerbffservice.dto;
 
 import com.olehprukhnytskyi.util.IntakePeriod;
+import com.olehprukhnytskyi.util.ModerationStatus;
 import com.olehprukhnytskyi.util.UnitType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.LocalDate;
@@ -44,4 +45,10 @@ public class IntakeDto {
     private NutrimentsDto nutriments = new NutrimentsDto();
 
     private List<UnitType> availableUnits;
+
+    private String originalFoodId;
+
+    private ModerationStatus moderationStatus = ModerationStatus.NONE;
+
+    private boolean verifiedByAdmin = false;
 }
