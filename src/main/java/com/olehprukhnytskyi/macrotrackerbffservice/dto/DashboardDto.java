@@ -14,4 +14,7 @@ public class DashboardDto {
 
     @Schema(description = "Paginated list of food intake records")
     private List<IntakeDto> intakes;
+
+    @Schema(description = "User profile")
+    private UserDetailsDto profile;
 }

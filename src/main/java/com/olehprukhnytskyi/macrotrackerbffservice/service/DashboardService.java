@@ -4,6 +4,7 @@ import com.olehprukhnytskyi.exception.ExternalServiceException;
 import com.olehprukhnytskyi.exception.error.CommonErrorCode;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.DashboardDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.IntakeDto;
+import com.olehprukhnytskyi.macrotrackerbffservice.dto.UserDetailsDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.UserGoalDto;
 import com.olehprukhnytskyi.util.CustomHeaders;
 import java.time.LocalDate;
@@ -45,11 +46,21 @@ public class DashboardService {
                 .onErrorMap(e -> new ExternalServiceException(
                         CommonErrorCode.UPSTREAM_SERVICE_UNAVAILABLE,
                         "Intake service unavailable", e));
-        return Mono.zip(userGoalMono, intakesMono)
+        Mono<UserDetailsDto> userDetailsMono = userWebClient.get()
+                .uri("/api/profile/details")
+                .header(CustomHeaders.X_USER_ID, userId.toString())
+                .retrieve()
+                .bodyToMono(UserDetailsDto.class)
+                .doOnError(e -> log.error("Failed to fetch user details for userId={}", userId, e))
+                .onErrorMap(e -> new ExternalServiceException(
+                        CommonErrorCode.UPSTREAM_SERVICE_UNAVAILABLE,
+                        "User service unavailable", e));
+        return Mono.zip(userGoalMono, intakesMono, userDetailsMono)
                 .map(tuple -> {
                     DashboardDto dto = DashboardDto.builder()
                             .goal(tuple.getT1())
                             .intakes(tuple.getT2())
+                            .profile(tuple.getT3())
                             .build();
                     log.debug("Successfully built dashboard DTO for userId={}", userId);
                     return dto;

@@ -29,6 +29,11 @@ class DashboardServiceTest {
                                 .body("[{\"id\": 1, \"calories\": 500}]")
                                 .header(HttpHeaders.CONTENT_TYPE, "application/json")
                                 .build());
+                    } else if (path.contains("/details")) {
+                        return Mono.just(ClientResponse.create(HttpStatus.OK)
+                                .body("{\"profile\":123}")
+                                .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                                .build());
                     }
 
                     return Mono.just(ClientResponse.create(HttpStatus.NOT_FOUND).build());
