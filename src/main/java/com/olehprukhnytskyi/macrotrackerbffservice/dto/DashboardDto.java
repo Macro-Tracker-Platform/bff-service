@@ -17,4 +17,7 @@ public class DashboardDto {
 
     @Schema(description = "User profile")
     private UserDetailsDto profile;
+
+    @Schema(description = "User weight logs")
+    private List<WeightLogDto> weightLogs;
 }

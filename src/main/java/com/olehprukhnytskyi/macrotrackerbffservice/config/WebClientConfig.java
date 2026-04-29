@@ -20,4 +20,9 @@ public class WebClientConfig {
     public WebClient intakeWebClient(WebClient.Builder builder) {
         return builder.baseUrl(externalServiceProperties.getIntakeServiceUrl()).build();
     }
+
+    @Bean
+    public WebClient weightWebClient(WebClient.Builder builder) {
+        return builder.baseUrl(externalServiceProperties.getWeightServiceUrl()).build();
+    }
 }

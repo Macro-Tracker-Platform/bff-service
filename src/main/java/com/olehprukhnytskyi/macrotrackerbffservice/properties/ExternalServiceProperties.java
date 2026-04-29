@@ -16,4 +16,7 @@ public class ExternalServiceProperties {
 
     @NotBlank
     private String intakeServiceUrl;
+
+    @NotBlank
+    private String weightServiceUrl;
 }

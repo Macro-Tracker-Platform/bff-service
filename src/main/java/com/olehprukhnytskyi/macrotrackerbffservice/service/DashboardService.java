@@ -6,6 +6,7 @@ import com.olehprukhnytskyi.macrotrackerbffservice.dto.DashboardDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.IntakeDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.UserDetailsDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.UserGoalDto;
+import com.olehprukhnytskyi.macrotrackerbffservice.dto.WeightLogDto;
 import com.olehprukhnytskyi.util.CustomHeaders;
 import java.time.LocalDate;
 import java.util.List;
@@ -22,6 +23,7 @@ import reactor.core.publisher.Mono;
 public class DashboardService {
     private final WebClient userWebClient;
     private final WebClient intakeWebClient;
+    private final WebClient weightWebClient;
 
     public Mono<DashboardDto> getDashboard(Long userId, LocalDate date) {
         log.debug("Fetching dashboard data for userId={}", userId);
@@ -55,12 +57,23 @@ public class DashboardService {
                 .onErrorMap(e -> new ExternalServiceException(
                         CommonErrorCode.UPSTREAM_SERVICE_UNAVAILABLE,
                         "User service unavailable", e));
-        return Mono.zip(userGoalMono, intakesMono, userDetailsMono)
+        Mono<List<WeightLogDto>> weightLogsMono = weightWebClient.get()
+                .uri("/api/weights")
+                .header(CustomHeaders.X_USER_ID, userId.toString())
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<List<WeightLogDto>>() {})
+                .doOnError(e -> log.error("Failed to fetch user weight logs for userId={}",
+                        userId, e))
+                .onErrorMap(e -> new ExternalServiceException(
+                        CommonErrorCode.UPSTREAM_SERVICE_UNAVAILABLE,
+                        "Weight service unavailable", e));
+        return Mono.zip(userGoalMono, intakesMono, userDetailsMono, weightLogsMono)
                 .map(tuple -> {
                     DashboardDto dto = DashboardDto.builder()
                             .goal(tuple.getT1())
                             .intakes(tuple.getT2())
                             .profile(tuple.getT3())
+                            .weightLogs(tuple.getT4())
                             .build();
                     log.debug("Successfully built dashboard DTO for userId={}", userId);
                     return dto;

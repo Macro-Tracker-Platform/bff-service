@@ -34,12 +34,16 @@ class DashboardServiceTest {
                                 .body("{\"profile\":123}")
                                 .header(HttpHeaders.CONTENT_TYPE, "application/json")
                                 .build());
+                    } else if (path.contains("/weights")) {
+                        return Mono.just(ClientResponse.create(HttpStatus.OK)
+                                .body("[{\"id\": 1, \"weights\": 500}]")
+                                .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                                .build());
                     }
-
                     return Mono.just(ClientResponse.create(HttpStatus.NOT_FOUND).build());
                 })
                 .build();
-        dashboardService = new DashboardService(mockClient, mockClient);
+        dashboardService = new DashboardService(mockClient, mockClient, mockClient);
     }
 
     @Test
