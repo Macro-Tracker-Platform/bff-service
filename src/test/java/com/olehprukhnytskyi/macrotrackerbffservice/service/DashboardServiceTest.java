@@ -36,7 +36,16 @@ class DashboardServiceTest {
                                 .build());
                     } else if (path.contains("/weights")) {
                         return Mono.just(ClientResponse.create(HttpStatus.OK)
-                                .body("[{\"id\": 1, \"weights\": 500}]")
+                                .body("""
+                                      {
+                                          "data": [{}],
+                                          "pagination": {
+                                              "offset": 0,
+                                              "limit": 20,
+                                              "total": 1
+                                          }
+                                      }
+                                      """)
                                 .header(HttpHeaders.CONTENT_TYPE, "application/json")
                                 .build());
                     }

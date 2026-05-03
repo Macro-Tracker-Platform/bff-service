@@ -1,5 +1,6 @@
 package com.olehprukhnytskyi.macrotrackerbffservice.dto;
 
+import com.olehprukhnytskyi.dto.PagedResponse;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import lombok.Builder;
@@ -19,5 +20,5 @@ public class DashboardDto {
     private UserDetailsDto profile;
 
     @Schema(description = "User weight logs")
-    private List<WeightLogDto> weightLogs;
+    private PagedResponse<WeightLogDto> weightLogs;
 }

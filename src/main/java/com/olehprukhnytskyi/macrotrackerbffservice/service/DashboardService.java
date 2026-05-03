@@ -1,5 +1,6 @@
 package com.olehprukhnytskyi.macrotrackerbffservice.service;
 
+import com.olehprukhnytskyi.dto.PagedResponse;
 import com.olehprukhnytskyi.exception.ExternalServiceException;
 import com.olehprukhnytskyi.exception.error.CommonErrorCode;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.DashboardDto;
@@ -57,11 +58,11 @@ public class DashboardService {
                 .onErrorMap(e -> new ExternalServiceException(
                         CommonErrorCode.UPSTREAM_SERVICE_UNAVAILABLE,
                         "User service unavailable", e));
-        Mono<List<WeightLogDto>> weightLogsMono = weightWebClient.get()
+        Mono<PagedResponse<WeightLogDto>> weightLogsMono = weightWebClient.get()
                 .uri("/api/weights")
                 .header(CustomHeaders.X_USER_ID, userId.toString())
                 .retrieve()
-                .bodyToMono(new ParameterizedTypeReference<List<WeightLogDto>>() {})
+                .bodyToMono(new ParameterizedTypeReference<PagedResponse<WeightLogDto>>() {})
                 .doOnError(e -> log.error("Failed to fetch user weight logs for userId={}",
                         userId, e))
                 .onErrorMap(e -> new ExternalServiceException(
