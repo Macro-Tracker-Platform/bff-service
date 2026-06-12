@@ -21,7 +21,7 @@ class DashboardServiceTest {
                     String path = request.url().getPath();
                     if (path.contains("/goal")) {
                         return Mono.just(ClientResponse.create(HttpStatus.OK)
-                                .body("{\"waterGoalMl\":2500}")
+                                .body("{\"waterGoalMl\":2500,\"waterGoalMode\":\"AUTO\"}")
                                 .header(HttpHeaders.CONTENT_TYPE, "application/json")
                                 .build());
                     } else if (path.contains("/intake")) {
@@ -59,7 +59,8 @@ class DashboardServiceTest {
     @DisplayName("Should aggregate dashboard data")
     void getDashboard_shouldAggregateDashboardData() {
         StepVerifier.create(dashboardService.getDashboard(1L, LocalDate.now()))
-                .expectNextMatches(dto -> dto.getGoal().getWaterGoalMl() == 2500)
+                .expectNextMatches(dto -> dto.getGoal().getWaterGoalMl() == 2500
+                        && "AUTO".equals(dto.getGoal().getWaterGoalMode()))
                 .verifyComplete();
     }
 }

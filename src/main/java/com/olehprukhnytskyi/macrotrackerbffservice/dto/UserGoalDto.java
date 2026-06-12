@@ -20,4 +20,7 @@ public class UserGoalDto {
 
     @Schema(description = "Daily water target in milliliters", example = "2500")
     private int waterGoalMl;
+
+    @Schema(description = "Whether the water goal is calculated or customized")
+    private String waterGoalMode;
 }
