@@ -17,4 +17,7 @@ public class UserGoalDto {
 
     @Schema(description = "Daily carbohydrates target in grams", example = "250")
     private int carbohydrates;
+
+    @Schema(description = "Daily water target in milliliters", example = "2500")
+    private int waterGoalMl;
 }
