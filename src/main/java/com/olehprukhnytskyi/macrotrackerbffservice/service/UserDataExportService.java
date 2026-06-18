@@ -55,8 +55,10 @@ public class UserDataExportService {
             "No data available for export for the selected period";
     private static final Set<ExportPreset> SUPPORTED_PRESETS =
             EnumSet.allOf(ExportPreset.class);
-    private static final DateTimeFormatter FILE_DATE_FORMAT =
-            DateTimeFormatter.ofPattern("yyyyMMdd", Locale.ROOT);
+    private static final DateTimeFormatter EXCEL_DATE_FORMAT =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.ROOT);
+    private static final DateTimeFormatter FILE_NAME_DATE_FORMAT =
+            DateTimeFormatter.ISO_LOCAL_DATE;
 
     private final WebClient intakeWebClient;
     private final WebClient weightWebClient;
@@ -218,7 +220,7 @@ public class UserDataExportService {
         for (LocalDate date : datesBetween(period)) {
             final List<IntakeDto> dailyIntakes = intakesByDate.getOrDefault(date, List.of());
             Row row = sheet.createRow(rowIndex++);
-            writeCell(row, 0, date.toString());
+            writeCell(row, 0, EXCEL_DATE_FORMAT.format(date));
             writeNumberOrBlank(row, 1, Optional.ofNullable(weightsByDate.get(date))
                     .map(WeightLogDto::getWeight)
                     .orElse(null));
@@ -257,7 +259,7 @@ public class UserDataExportService {
             final NutrimentsDto nutrients = intake.getNutriments() == null
                     ? new NutrimentsDto()
                     : intake.getNutriments();
-            writeCell(row, 0, intake.getDate().toString());
+            writeCell(row, 0, EXCEL_DATE_FORMAT.format(intake.getDate()));
             writeCell(row, 1, String.valueOf(intake.getIntakePeriod()));
             writeCell(row, 2, intake.getFoodName());
             writeCell(row, 3, intake.getAmount());
@@ -343,9 +345,9 @@ public class UserDataExportService {
     }
 
     private String filename(ExportPeriodDto period) {
-        return "macro-tracker-export-%s-%s.xlsx".formatted(
-                FILE_DATE_FORMAT.format(period.startDate()),
-                FILE_DATE_FORMAT.format(period.endDate()));
+        return "MacroTracker_%s_to_%s.xlsx".formatted(
+                FILE_NAME_DATE_FORMAT.format(period.startDate()),
+                FILE_NAME_DATE_FORMAT.format(period.endDate()));
     }
 
     private enum ExportPreset {
