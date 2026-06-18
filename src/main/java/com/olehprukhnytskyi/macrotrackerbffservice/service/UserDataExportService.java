@@ -11,7 +11,6 @@ import com.olehprukhnytskyi.macrotrackerbffservice.dto.WeightLogDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.export.ExportFileDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.export.ExportPeriodDto;
 import com.olehprukhnytskyi.util.CustomHeaders;
-import com.olehprukhnytskyi.util.UnitType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
