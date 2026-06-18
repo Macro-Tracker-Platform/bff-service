@@ -16,6 +16,7 @@
 
     <properties>
         <java.version>21</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-cloud.version>2025.0.0</spring-cloud.version>
         <maven.checkstyle.plugin.configLocation>
             checkstyle.xml
@@ -43,7 +44,7 @@
         <dependency>
             <groupId>com.olehprukhnytskyi</groupId>
             <artifactId>macro-tracker-common</artifactId>
-            <version>1.1.4</version>
+            <version>1.1.6</version>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -69,6 +70,11 @@
             <groupId>io.projectreactor</groupId>
             <artifactId>reactor-test</artifactId>
             <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>5.2.5</version>
         </dependency>
         <dependency>
             <groupId>org.springdoc</groupId>
