@@ -242,7 +242,6 @@ public class UserDataExportService {
                 "Food",
                 "Amount",
                 "Unit",
-                "Equivalent in Grams",
                 "Calories",
                 "Protein",
                 "Fat",
@@ -264,20 +263,12 @@ public class UserDataExportService {
             writeCell(row, 2, intake.getFoodName());
             writeCell(row, 3, intake.getAmount());
             writeCell(row, 4, String.valueOf(intake.getUnitType()));
-            writeNumberOrBlank(row, 5, gramEquivalent(intake));
-            writeCell(row, 6, nullToZero(nutrients.getCalories()));
-            writeCell(row, 7, nullToZero(nutrients.getCarbohydrates()));
-            writeCell(row, 8, nullToZero(nutrients.getFat()));
-            writeCell(row, 9, nullToZero(nutrients.getProtein()));
+            writeCell(row, 5, nullToZero(nutrients.getCalories()));
+            writeCell(row, 6, nullToZero(nutrients.getCarbohydrates()));
+            writeCell(row, 7, nullToZero(nutrients.getFat()));
+            writeCell(row, 8, nullToZero(nutrients.getProtein()));
         }
-        autosize(sheet, 10);
-    }
-
-    private BigDecimal gramEquivalent(IntakeDto intake) {
-        // Pieces do not carry grams-per-piece today, so exporting null keeps the value honest.
-        return intake.getUnitType() == UnitType.GRAMS
-                ? BigDecimal.valueOf(intake.getAmount())
-                : null;
+        autosize(sheet, 9);
     }
 
     private List<LocalDate> datesBetween(ExportPeriodDto period) {
