@@ -9,9 +9,7 @@ import com.olehprukhnytskyi.macrotrackerbffservice.dto.WeightLogDto;
 import com.olehprukhnytskyi.util.CustomHeaders;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
-import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -51,8 +49,7 @@ public class InsightsService {
     public Mono<WeeklyReportDto> getWeeklyReport(Long userId, LocalDate requestedStart,
                                                  String appVersionCode) {
         LocalDate start = requestedStart == null
-                ? LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
-                .minusWeeks(1)
+                ? LocalDate.now().minusDays(6)
                 : requestedStart;
         LocalDate end = start.plusDays(6);
         return ensureAdvancedInsights(userId, appVersionCode)
