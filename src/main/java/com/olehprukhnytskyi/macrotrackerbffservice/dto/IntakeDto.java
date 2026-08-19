@@ -11,6 +11,11 @@ import lombok.Data;
 @Data
 @Schema(description = "Food intake record")
 public class IntakeDto {
+    public enum Status {
+        CONSUMED,
+        PLANNED
+    }
+
     @Schema(description = "Intake record ID", example = "1")
     private Long id;
 
@@ -40,6 +45,8 @@ public class IntakeDto {
 
     @Schema(description = "Consumption period", example = "BREAKFAST")
     private IntakePeriod intakePeriod;
+
+    private Status status;
 
     @Schema(description = "Nutritional values")
     private NutrimentsDto nutriments = new NutrimentsDto();

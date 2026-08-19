@@ -1,6 +1,9 @@
 package com.olehprukhnytskyi.macrotrackerbffservice.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.DailyNutritionSummaryDto;
+import com.olehprukhnytskyi.macrotrackerbffservice.dto.DatedGoalDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.InsightsDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.UserEntitlementDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.UserGoalDto;
@@ -85,11 +88,13 @@ public class InsightsService {
                 .header(CustomHeaders.X_USER_ID, userId.toString())
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<>() {});
-        Mono<UserGoalDto> goals = userWebClient.get()
-                .uri("/api/profile/goal")
+        Mono<List<DatedGoalDto>> goals = userWebClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/profile/goal/range")
+                        .queryParam("from", from).queryParam("to", to).build())
                 .header(CustomHeaders.X_USER_ID, userId.toString())
                 .retrieve()
-                .bodyToMono(UserGoalDto.class);
+                .bodyToMono(JsonNode.class)
+                .map(node -> parseDatedGoals(node, from, to));
         Mono<List<WeightLogDto>> weights = weightWebClient.get()
                 .uri(uriBuilder -> uriBuilder.path("/api/weights/range")
                         .queryParam("startDate", from)
@@ -216,22 +221,54 @@ public class InsightsService {
                 .build();
     }
 
-    private int countCaloriesInRange(List<DailyNutritionSummaryDto> rows, UserGoalDto goal) {
-        BigDecimal target = BigDecimal.valueOf(goal.getCalories());
-        BigDecimal lower = target.multiply(CALORIE_LOWER);
-        BigDecimal upper = target.multiply(CALORIE_UPPER);
-        return (int) rows.stream().filter(row -> row.getCalories().compareTo(lower) >= 0
-                && row.getCalories().compareTo(upper) <= 0).count();
+    private int countCaloriesInRange(List<DailyNutritionSummaryDto> rows,
+                                     List<DatedGoalDto> goals) {
+        return (int) rows.stream().filter(row -> {
+            BigDecimal target = BigDecimal.valueOf(goalFor(goals, row.getDate()).getCalories());
+            return row.getCalories().compareTo(target.multiply(CALORIE_LOWER)) >= 0
+                    && row.getCalories().compareTo(target.multiply(CALORIE_UPPER)) <= 0;
+        }).count();
     }
 
-    private int countHighCalories(List<DailyNutritionSummaryDto> rows, UserGoalDto goal) {
-        BigDecimal high = BigDecimal.valueOf(goal.getCalories()).multiply(CALORIE_HIGH);
-        return (int) rows.stream().filter(row -> row.getCalories().compareTo(high) > 0).count();
+    private int countHighCalories(List<DailyNutritionSummaryDto> rows,
+                                  List<DatedGoalDto> goals) {
+        return (int) rows.stream().filter(row -> row.getCalories().compareTo(
+                BigDecimal.valueOf(goalFor(goals, row.getDate()).getCalories())
+                        .multiply(CALORIE_HIGH)) > 0).count();
     }
 
-    private int countProteinGoal(List<DailyNutritionSummaryDto> rows, UserGoalDto goal) {
-        BigDecimal target = BigDecimal.valueOf(goal.getProtein()).multiply(PROTEIN_TARGET);
-        return (int) rows.stream().filter(row -> row.getProtein().compareTo(target) >= 0).count();
+    private int countProteinGoal(List<DailyNutritionSummaryDto> rows,
+                                 List<DatedGoalDto> goals) {
+        return (int) rows.stream().filter(row -> row.getProtein().compareTo(
+                BigDecimal.valueOf(goalFor(goals, row.getDate()).getProtein())
+                        .multiply(PROTEIN_TARGET)) >= 0).count();
+    }
+
+    private UserGoalDto goalFor(List<DatedGoalDto> goals, LocalDate date) {
+        return goals.stream().filter(item -> date.equals(item.getDate()))
+                .map(DatedGoalDto::getGoal).findFirst()
+                .orElseGet(() -> goals.isEmpty() ? new UserGoalDto() : goals.getLast().getGoal());
+    }
+
+    private List<DatedGoalDto> parseDatedGoals(JsonNode node, LocalDate from, LocalDate to) {
+        ObjectMapper mapper = new ObjectMapper();
+        if (!node.isArray()) {
+            UserGoalDto goal = mapper.convertValue(node, UserGoalDto.class);
+            return from.datesUntil(to.plusDays(1)).map(date -> {
+                DatedGoalDto item = new DatedGoalDto();
+                item.setDate(date);
+                item.setGoal(goal);
+                return item;
+            }).toList();
+        }
+        List<DatedGoalDto> result = new ArrayList<>();
+        node.forEach(value -> {
+            DatedGoalDto item = new DatedGoalDto();
+            item.setDate(LocalDate.parse(value.path("date").asText()));
+            item.setGoal(mapper.convertValue(value.path("goal"), UserGoalDto.class));
+            result.add(item);
+        });
+        return result;
     }
 
     private BigDecimal average(List<DailyNutritionSummaryDto> rows, Metric metric) {
@@ -289,6 +326,6 @@ public class InsightsService {
     }
 
     private record InsightData(List<DailyNutritionSummaryDto> summaries,
-                               UserGoalDto goals, List<WeightLogDto> weights) {
+                               List<DatedGoalDto> goals, List<WeightLogDto> weights) {
     }
 }

@@ -10,5 +10,6 @@ public class UserEntitlementDto {
     @Data
     public static class Features {
         private boolean advancedInsights;
+        private boolean adaptiveCalories;
     }
 }

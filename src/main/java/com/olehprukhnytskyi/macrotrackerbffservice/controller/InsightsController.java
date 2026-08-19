@@ -1,7 +1,9 @@
 package com.olehprukhnytskyi.macrotrackerbffservice.controller;
 
+import com.olehprukhnytskyi.macrotrackerbffservice.dto.AdaptiveCalorieRecommendationDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.InsightsDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.WeeklyReportDto;
+import com.olehprukhnytskyi.macrotrackerbffservice.service.AdaptiveCalorieService;
 import com.olehprukhnytskyi.macrotrackerbffservice.service.InsightsService;
 import com.olehprukhnytskyi.util.CustomHeaders;
 import java.time.LocalDate;
@@ -22,6 +24,7 @@ public class InsightsController {
     private static final String APP_VERSION_CODE_HEADER = "X-App-Version-Code";
 
     private final InsightsService insightsService;
+    private final AdaptiveCalorieService adaptiveCalorieService;
 
     @GetMapping
     public Mono<ResponseEntity<InsightsDto>> insights(
@@ -42,5 +45,11 @@ public class InsightsController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart) {
         return insightsService.getWeeklyReport(userId, weekStart, appVersionCode)
                 .map(ResponseEntity::ok);
+    }
+
+    @GetMapping("/adaptive-calories")
+    public Mono<ResponseEntity<AdaptiveCalorieRecommendationDto>> adaptiveCalories(
+            @RequestHeader(CustomHeaders.X_USER_ID) Long userId) {
+        return adaptiveCalorieService.recommendation(userId).map(ResponseEntity::ok);
     }
 }

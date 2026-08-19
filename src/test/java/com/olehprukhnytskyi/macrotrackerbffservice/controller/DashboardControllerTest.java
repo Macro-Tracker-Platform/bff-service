@@ -32,7 +32,7 @@ class DashboardControllerTest {
 
         LocalDate now = LocalDate.now();
 
-        when(dashboardService.getDashboard(1L, now)).thenReturn(Mono.just(dto));
+        when(dashboardService.getDashboard(1L, now, null)).thenReturn(Mono.just(dto));
 
         // When & Then
         webTestClient.get()

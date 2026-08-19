@@ -22,15 +22,26 @@ import reactor.core.publisher.Mono;
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
+    private static final String APP_VERSION_CODE_HEADER = "X-App-Version-Code";
     private final WebClient userWebClient;
     private final WebClient intakeWebClient;
     private final WebClient weightWebClient;
 
     public Mono<DashboardDto> getDashboard(Long userId, LocalDate date) {
+        return getDashboard(userId, date, null);
+    }
+
+    public Mono<DashboardDto> getDashboard(Long userId, LocalDate date, String appVersionCode) {
         log.debug("Fetching dashboard data for userId={}", userId);
         Mono<UserGoalDto> userGoalMono = userWebClient.get()
-                .uri("/api/profile/goal")
-                .header(CustomHeaders.X_USER_ID, userId.toString())
+                .uri(uriBuilder -> uriBuilder.path("/api/profile/goal")
+                        .queryParam("date", date).build())
+                .headers(headers -> {
+                    headers.set(CustomHeaders.X_USER_ID, userId.toString());
+                    if (appVersionCode != null && !appVersionCode.isBlank()) {
+                        headers.set(APP_VERSION_CODE_HEADER, appVersionCode);
+                    }
+                })
                 .retrieve()
                 .bodyToMono(UserGoalDto.class)
                 .doOnError(e -> log.error("Failed to fetch user goals for userId={}", userId, e))
@@ -42,7 +53,12 @@ public class DashboardService {
                         .path("/api/intake")
                         .queryParam("date", date)
                         .build())
-                .header(CustomHeaders.X_USER_ID, userId.toString())
+                .headers(headers -> {
+                    headers.set(CustomHeaders.X_USER_ID, userId.toString());
+                    if (appVersionCode != null && !appVersionCode.isBlank()) {
+                        headers.set(APP_VERSION_CODE_HEADER, appVersionCode);
+                    }
+                })
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<List<IntakeDto>>() {})
                 .doOnError(e -> log.error("Failed to fetch intakes for userId={}", userId, e))

@@ -26,6 +26,7 @@ import reactor.core.publisher.Mono;
         description = "API for aggregating and retrieving user nutrition dashboard data"
 )
 public class DashboardController {
+    private static final String APP_VERSION_CODE_HEADER = "X-App-Version-Code";
     private final DashboardService dashboardService;
 
     @Operation(
@@ -35,9 +36,11 @@ public class DashboardController {
     @GetMapping
     public Mono<ResponseEntity<DashboardDto>> getDashboard(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            @RequestHeader(CustomHeaders.X_USER_ID) Long userId) {
+            @RequestHeader(CustomHeaders.X_USER_ID) Long userId,
+            @RequestHeader(value = APP_VERSION_CODE_HEADER, required = false)
+            String appVersionCode) {
         log.debug("Received dashboard request for userId={}", userId);
-        return dashboardService.getDashboard(userId, date)
+        return dashboardService.getDashboard(userId, date, appVersionCode)
                 .doOnSuccess(dto -> log
                         .debug("Dashboard data aggregated successfully for userId={}", userId))
                 .doOnError(error -> log
