@@ -161,11 +161,23 @@ public class InsightsService {
                             ? null : calories.multiply(BigDecimal.valueOf(100))
                                     .divide(BigDecimal.valueOf(goal.getCalories()), 1,
                                             RoundingMode.HALF_UP);
+                    BigDecimal carbohydratePercent = summary == null ? null
+                            : nutrientCaloriePercent(summary.getCarbohydrates(), 4,
+                                    goal.getCalories());
+                    BigDecimal proteinPercent = summary == null ? null
+                            : nutrientCaloriePercent(summary.getProtein(), 4,
+                                    goal.getCalories());
+                    BigDecimal fatPercent = summary == null ? null
+                            : nutrientCaloriePercent(summary.getFat(), 9,
+                                    goal.getCalories());
                     return InsightsDto.ChartPoint.builder()
                             .date(date)
                             .calories(calories)
                             .calorieGoal(goal.getCalories() > 0 ? goal.getCalories() : null)
                             .nutritionPercent(nutritionPercent)
+                            .carbohydratePercent(carbohydratePercent)
+                            .proteinPercent(proteinPercent)
+                            .fatPercent(fatPercent)
                             .weight(weight)
                             .waterMl(waterByDate.getOrDefault(date, 0))
                             .waterGoalMl(goal.getWaterGoalMl() > 0
@@ -345,6 +357,15 @@ public class InsightsService {
     private BigDecimal bmi(BigDecimal weightKg, BigDecimal heightMetres) {
         return weightKg.divide(heightMetres.multiply(heightMetres), 1,
                 RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal nutrientCaloriePercent(BigDecimal grams, int caloriesPerGram,
+                                               int calorieGoal) {
+        if (grams == null || calorieGoal <= 0) {
+            return null;
+        }
+        return grams.multiply(BigDecimal.valueOf(caloriesPerGram * 100L))
+                .divide(BigDecimal.valueOf(calorieGoal), 1, RoundingMode.HALF_UP);
     }
 
     private int parsePeriod(String period) {

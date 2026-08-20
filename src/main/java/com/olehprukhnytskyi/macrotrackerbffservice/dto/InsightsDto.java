@@ -59,6 +59,9 @@ public class InsightsDto {
         private BigDecimal calories;
         private Integer calorieGoal;
         private BigDecimal nutritionPercent;
+        private BigDecimal carbohydratePercent;
+        private BigDecimal proteinPercent;
+        private BigDecimal fatPercent;
         private BigDecimal weight;
         private Integer waterMl;
         private Integer waterGoalMl;
