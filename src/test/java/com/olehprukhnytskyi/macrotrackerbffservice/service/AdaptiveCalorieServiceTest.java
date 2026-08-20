@@ -49,6 +49,34 @@ class AdaptiveCalorieServiceTest {
         assertThat(result.getExplanation()).contains("2000 → 1900");
     }
 
+    @Test
+    void volatileTestWeightDoesNotProduceAbsurdMaintenanceEstimate() {
+        LocalDate today = LocalDate.now();
+        List<DailyNutritionSummaryDto> summaries = new ArrayList<>();
+        for (int index = 0; index < 10; index++) {
+            DailyNutritionSummaryDto row = new DailyNutritionSummaryDto();
+            row.setDate(today.minusDays(index));
+            row.setCalories(BigDecimal.valueOf(2200));
+            summaries.add(row);
+        }
+        List<WeightLogDto> weights = List.of(
+                weight(today.minusDays(18), "100.0"),
+                weight(today.minusDays(12), "88.0"),
+                weight(today.minusDays(6), "74.0"),
+                weight(today, "60.0"));
+        UserGoalDto goal = new UserGoalDto();
+        goal.setCalories(2200);
+        UserDetailsDto profile = UserDetailsDto.builder().goal(Goal.LOSE)
+                .weight(100).goalWeight(75).build();
+
+        AdaptiveCalorieRecommendationDto result = service.build(
+                summaries, weights, goal, profile, new GoalChangeDto());
+
+        assertThat(result.isEligible()).isFalse();
+        assertThat(result.getEstimatedMaintenanceCalories()).isNull();
+        assertThat(result.getBlockers()).anyMatch(value -> value.contains("too volatile"));
+    }
+
     private WeightLogDto weight(LocalDate date, String value) {
         return WeightLogDto.builder().date(date).weight(new BigDecimal(value)).build();
     }

@@ -5,8 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.DailyNutritionSummaryDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.DatedGoalDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.InsightsDto;
+import com.olehprukhnytskyi.macrotrackerbffservice.dto.UserDetailsDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.UserEntitlementDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.UserGoalDto;
+import com.olehprukhnytskyi.macrotrackerbffservice.dto.WaterLogDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.WeeklyReportDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.WeightLogDto;
 import com.olehprukhnytskyi.util.CustomHeaders;
@@ -18,6 +20,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
@@ -106,8 +109,23 @@ public class InsightsService {
                 .header(CustomHeaders.X_USER_ID, userId.toString())
                 .retrieve()
                 .bodyToMono(new ParameterizedTypeReference<>() {});
-        return Mono.zip(summaries, goals, weights)
-                .map(tuple -> new InsightData(tuple.getT1(), tuple.getT2(), tuple.getT3()));
+        Mono<List<WaterLogDto>> water = weightWebClient.get()
+                .uri(uriBuilder -> uriBuilder.path("/api/water/range")
+                        .queryParam("startDate", from)
+                        .queryParam("endDate", to)
+                        .build())
+                .header(CustomHeaders.X_USER_ID, userId.toString())
+                .retrieve()
+                .bodyToMono(new ParameterizedTypeReference<List<WaterLogDto>>() {})
+                .onErrorReturn(List.of());
+        Mono<UserDetailsDto> profile = userWebClient.get().uri("/api/profile/details")
+                .header(CustomHeaders.X_USER_ID, userId.toString())
+                .retrieve()
+                .bodyToMono(UserDetailsDto.class)
+                .onErrorReturn(new UserDetailsDto());
+        return Mono.zip(summaries, goals, weights, water, profile)
+                .map(tuple -> new InsightData(tuple.getT1(), tuple.getT2(), tuple.getT3(),
+                        tuple.getT4(), tuple.getT5()));
     }
 
     private InsightsDto buildInsights(String period, LocalDate from, LocalDate to,
@@ -123,13 +141,40 @@ public class InsightsService {
         periodRows.forEach(row -> summariesByDate.put(row.getDate(), row));
         Map<LocalDate, BigDecimal> weightsByDate = new HashMap<>();
         periodWeights.forEach(row -> weightsByDate.put(row.getDate(), row.getWeight()));
+        Map<LocalDate, Integer> waterByDate = data.waterLogs().stream()
+                .filter(row -> row.getDate() != null && !row.getDate().isBefore(from))
+                .collect(Collectors.groupingBy(WaterLogDto::getDate,
+                        Collectors.summingInt(WaterLogDto::getAmountMl)));
+        BigDecimal heightMetres = data.profile().getHeight() == null
+                || data.profile().getHeight() <= 0 ? null
+                : BigDecimal.valueOf(data.profile().getHeight())
+                        .divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        BigDecimal goalBmi = heightMetres == null || data.profile().getGoalWeight() == null
+                ? null : bmi(BigDecimal.valueOf(data.profile().getGoalWeight()), heightMetres);
         List<InsightsDto.ChartPoint> chart = from.datesUntil(to.plusDays(1))
-                .map(date -> InsightsDto.ChartPoint.builder()
-                        .date(date)
-                        .calories(summariesByDate.containsKey(date)
-                                ? summariesByDate.get(date).getCalories() : null)
-                        .weight(weightsByDate.get(date))
-                        .build())
+                .map(date -> {
+                    DailyNutritionSummaryDto summary = summariesByDate.get(date);
+                    UserGoalDto goal = goalFor(data.goals(), date);
+                    BigDecimal calories = summary == null ? null : summary.getCalories();
+                    BigDecimal weight = weightsByDate.get(date);
+                    BigDecimal nutritionPercent = calories == null || goal.getCalories() <= 0
+                            ? null : calories.multiply(BigDecimal.valueOf(100))
+                                    .divide(BigDecimal.valueOf(goal.getCalories()), 1,
+                                            RoundingMode.HALF_UP);
+                    return InsightsDto.ChartPoint.builder()
+                            .date(date)
+                            .calories(calories)
+                            .calorieGoal(goal.getCalories() > 0 ? goal.getCalories() : null)
+                            .nutritionPercent(nutritionPercent)
+                            .weight(weight)
+                            .waterMl(waterByDate.getOrDefault(date, 0))
+                            .waterGoalMl(goal.getWaterGoalMl() > 0
+                                    ? goal.getWaterGoalMl() : null)
+                            .bmi(weight == null || heightMetres == null
+                                    ? null : bmi(weight, heightMetres))
+                            .goalBmi(goalBmi)
+                            .build();
+                })
                 .toList();
         return InsightsDto.builder()
                 .period(period)
@@ -297,6 +342,11 @@ public class InsightsService {
                 && !row.getDate().isAfter(to)).toList();
     }
 
+    private BigDecimal bmi(BigDecimal weightKg, BigDecimal heightMetres) {
+        return weightKg.divide(heightMetres.multiply(heightMetres), 1,
+                RoundingMode.HALF_UP);
+    }
+
     private int parsePeriod(String period) {
         return switch (period) {
             case "7d" -> 7;
@@ -337,6 +387,7 @@ public class InsightsService {
     }
 
     private record InsightData(List<DailyNutritionSummaryDto> summaries,
-                               List<DatedGoalDto> goals, List<WeightLogDto> weights) {
+                               List<DatedGoalDto> goals, List<WeightLogDto> weights,
+                               List<WaterLogDto> waterLogs, UserDetailsDto profile) {
     }
 }

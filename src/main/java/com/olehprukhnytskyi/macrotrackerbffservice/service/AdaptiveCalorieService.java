@@ -30,6 +30,9 @@ public class AdaptiveCalorieService {
     private static final int REQUIRED_WEIGHTS = 4;
     private static final int REQUIRED_WEIGHT_SPAN = 10;
     private static final int ADJUSTMENT = 100;
+    private static final double MAX_PLAUSIBLE_WEEKLY_WEIGHT_CHANGE_KG = 1.5;
+    private static final int MIN_PLAUSIBLE_MAINTENANCE_CALORIES = 1000;
+    private static final int MAX_PLAUSIBLE_MAINTENANCE_CALORIES = 6000;
     private final WebClient userWebClient;
     private final WebClient intakeWebClient;
     private final WebClient weightWebClient;
@@ -98,6 +101,10 @@ public class AdaptiveCalorieService {
             blockers.add("Keep the current goal for 14 days before adapting it again");
         }
         BigDecimal trend = regressionTrend(ordered);
+        if (trend.abs().compareTo(BigDecimal.valueOf(
+                MAX_PLAUSIBLE_WEEKLY_WEIGHT_CHANGE_KG)) > 0) {
+            blockers.add("Recent weight changes are too volatile for a reliable estimate");
+        }
         BigDecimal targetTrend = targetTrend(profile, ordered);
         Integer maintenance = estimatedMaintenance(summaries, trend);
         Integer weeksToGoal = estimatedWeeksToGoal(profile, ordered, targetTrend);
@@ -202,8 +209,16 @@ public class AdaptiveCalorieService {
 
     private Integer estimatedMaintenance(List<DailyNutritionSummaryDto> summaries,
                                          BigDecimal trend) {
+        if (trend.abs().compareTo(BigDecimal.valueOf(
+                MAX_PLAUSIBLE_WEEKLY_WEIGHT_CHANGE_KG)) > 0) {
+            return null;
+        }
         List<BigDecimal> logged = summaries.stream().map(DailyNutritionSummaryDto::getCalories)
-                .filter(value -> value != null && value.signum() > 0).toList();
+                .filter(value -> value != null
+                        && value.compareTo(BigDecimal.valueOf(500)) >= 0
+                        && value.compareTo(BigDecimal.valueOf(
+                                MAX_PLAUSIBLE_MAINTENANCE_CALORIES)) <= 0)
+                .toList();
         if (logged.isEmpty()) {
             return null;
         }
@@ -212,7 +227,11 @@ public class AdaptiveCalorieService {
         BigDecimal dailyStoredEnergy = trend.multiply(BigDecimal.valueOf(7700))
                 .divide(BigDecimal.valueOf(7), 0, RoundingMode.HALF_UP);
         int estimate = average.subtract(dailyStoredEnergy).intValue();
-        return Math.max(800, (int) Math.round(estimate / 10.0) * 10);
+        if (estimate < MIN_PLAUSIBLE_MAINTENANCE_CALORIES
+                || estimate > MAX_PLAUSIBLE_MAINTENANCE_CALORIES) {
+            return null;
+        }
+        return (int) Math.round(estimate / 10.0) * 10;
     }
 
     private Integer estimatedWeeksToGoal(UserDetailsDto profile, List<WeightLogDto> ordered,

@@ -57,6 +57,12 @@ public class InsightsDto {
     public static class ChartPoint {
         private LocalDate date;
         private BigDecimal calories;
+        private Integer calorieGoal;
+        private BigDecimal nutritionPercent;
         private BigDecimal weight;
+        private Integer waterMl;
+        private Integer waterGoalMl;
+        private BigDecimal bmi;
+        private BigDecimal goalBmi;
     }
 }
