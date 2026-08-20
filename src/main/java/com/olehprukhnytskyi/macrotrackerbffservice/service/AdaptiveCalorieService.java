@@ -69,11 +69,11 @@ public class AdaptiveCalorieService {
                         tuple.getT5()));
     }
 
-    private AdaptiveCalorieRecommendationDto build(List<DailyNutritionSummaryDto> summaries,
-                                                    List<WeightLogDto> weights,
-                                                    UserGoalDto goal,
-                                                    UserDetailsDto profile,
-                                                    GoalChangeDto goalChange) {
+    AdaptiveCalorieRecommendationDto build(List<DailyNutritionSummaryDto> summaries,
+                                           List<WeightLogDto> weights,
+                                           UserGoalDto goal,
+                                           UserDetailsDto profile,
+                                           GoalChangeDto goalChange) {
         List<WeightLogDto> ordered = weights.stream()
                 .filter(item -> item.getDate() != null && item.getWeight() != null)
                 .sorted(Comparator.comparing(WeightLogDto::getDate)).toList();
@@ -98,19 +98,39 @@ public class AdaptiveCalorieService {
             blockers.add("Keep the current goal for 14 days before adapting it again");
         }
         BigDecimal trend = regressionTrend(ordered);
+        BigDecimal targetTrend = targetTrend(profile, ordered);
+        Integer maintenance = estimatedMaintenance(summaries, trend);
+        Integer weeksToGoal = estimatedWeeksToGoal(profile, ordered, targetTrend);
+        LocalDate goalDate = weeksToGoal == null ? null
+                : LocalDate.now().plusWeeks(weeksToGoal);
+        LocalDate nextCheckIn = goalChange.getLastChangedAt() != null
+                && goalChange.getLastChangedAt().isAfter(LocalDate.now().minusDays(14))
+                ? goalChange.getLastChangedAt().plusDays(14) : LocalDate.now().plusWeeks(1);
         if (!blockers.isEmpty()) {
             return base(goal, loggedDays, ordered.size(), span, trend).eligible(false)
+                    .targetKgPerWeek(targetTrend)
+                    .estimatedMaintenanceCalories(maintenance)
+                    .nextCheckInDate(nextCheckIn)
+                    .status("BUILDING_DATA")
                     .explanation("More consistent data is needed before suggesting a safe change.")
                     .blockers(blockers).build();
         }
         int delta = chooseDelta(profile.getGoal() == null
-                ? "MAINTAIN" : profile.getGoal().name(), trend);
-        String explanation = delta == 0
-                ? "Your recent weight trend is aligned with your goal. Keep your current target."
-                : "Based on your logged intake and weight trend, a small "
-                + (delta > 0 ? "increase" : "decrease") + " is the safest next step.";
+                ? "MAINTAIN" : profile.getGoal().name(), trend, targetTrend);
+        if (goal.getCalories() <= 1200 && delta < 0) {
+            delta = 0;
+        }
+        int suggested = goal.getCalories() + delta;
+        String explanation = explanation(goal.getCalories(), suggested, trend, targetTrend,
+                delta);
         return base(goal, loggedDays, ordered.size(), span, trend).eligible(true)
-                .suggestedCalories(goal.getCalories() + delta).calorieDelta(delta)
+                .suggestedCalories(suggested).calorieDelta(delta)
+                .targetKgPerWeek(targetTrend)
+                .estimatedMaintenanceCalories(maintenance)
+                .estimatedWeeksToGoal(weeksToGoal)
+                .estimatedGoalDate(goalDate)
+                .nextCheckInDate(nextCheckIn)
+                .status(delta == 0 ? "ON_TRACK" : "ADJUSTMENT_RECOMMENDED")
                 .explanation(explanation).blockers(List.of()).build();
     }
 
@@ -142,20 +162,21 @@ public class AdaptiveCalorieService {
         return BigDecimal.valueOf(perWeek).setScale(2, RoundingMode.HALF_UP);
     }
 
-    private int chooseDelta(String goal, BigDecimal trend) {
+    private int chooseDelta(String goal, BigDecimal trend, BigDecimal targetTrend) {
         double weekly = trend.doubleValue();
+        double target = targetTrend.doubleValue();
         if ("LOSE".equals(goal)) {
-            if (weekly > -0.1) {
+            if (weekly > target + 0.15) {
                 return -ADJUSTMENT;
             }
-            if (weekly < -1.0) {
+            if (weekly < target - 0.25) {
                 return ADJUSTMENT;
             }
         } else if ("GAIN".equals(goal)) {
-            if (weekly < 0.1) {
+            if (weekly < target - 0.10) {
                 return ADJUSTMENT;
             }
-            if (weekly > 0.75) {
+            if (weekly > target + 0.20) {
                 return -ADJUSTMENT;
             }
         } else if (weekly > 0.25) {
@@ -164,5 +185,59 @@ public class AdaptiveCalorieService {
             return ADJUSTMENT;
         }
         return 0;
+    }
+
+    private BigDecimal targetTrend(UserDetailsDto profile, List<WeightLogDto> ordered) {
+        double currentWeight = ordered.isEmpty() ? profile.getWeight() == null ? 70.0
+                : profile.getWeight() : ordered.getLast().getWeight().doubleValue();
+        String goal = profile.getGoal() == null ? "MAINTAIN" : profile.getGoal().name();
+        double weekly = 0;
+        if ("LOSE".equals(goal)) {
+            weekly = -Math.max(0.25, Math.min(1.0, currentWeight * 0.005));
+        } else if ("GAIN".equals(goal)) {
+            weekly = Math.max(0.10, Math.min(0.50, currentWeight * 0.0025));
+        }
+        return BigDecimal.valueOf(weekly).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private Integer estimatedMaintenance(List<DailyNutritionSummaryDto> summaries,
+                                         BigDecimal trend) {
+        List<BigDecimal> logged = summaries.stream().map(DailyNutritionSummaryDto::getCalories)
+                .filter(value -> value != null && value.signum() > 0).toList();
+        if (logged.isEmpty()) {
+            return null;
+        }
+        BigDecimal average = logged.stream().reduce(BigDecimal.ZERO, BigDecimal::add)
+                .divide(BigDecimal.valueOf(logged.size()), 0, RoundingMode.HALF_UP);
+        BigDecimal dailyStoredEnergy = trend.multiply(BigDecimal.valueOf(7700))
+                .divide(BigDecimal.valueOf(7), 0, RoundingMode.HALF_UP);
+        int estimate = average.subtract(dailyStoredEnergy).intValue();
+        return Math.max(800, (int) Math.round(estimate / 10.0) * 10);
+    }
+
+    private Integer estimatedWeeksToGoal(UserDetailsDto profile, List<WeightLogDto> ordered,
+                                         BigDecimal targetTrend) {
+        if (profile.getGoalWeight() == null || targetTrend.signum() == 0) {
+            return null;
+        }
+        double current = ordered.isEmpty() ? profile.getWeight() == null ? 0
+                : profile.getWeight() : ordered.getLast().getWeight().doubleValue();
+        if (current <= 0) {
+            return null;
+        }
+        double distance = Math.abs(current - profile.getGoalWeight());
+        return Math.max(1, (int) Math.ceil(distance / Math.abs(targetTrend.doubleValue())));
+    }
+
+    private String explanation(int current, int suggested, BigDecimal observed,
+                               BigDecimal target, int delta) {
+        String trendText = "Weight trend: " + observed + " kg/week; target: "
+                + target + " kg/week. ";
+        if (delta == 0) {
+            return trendText + "You are on track, so keep your current " + current
+                    + " kcal target.";
+        }
+        return trendText + "We recommend " + current + " → " + suggested
+                + " kcal/day for the next week.";
     }
 }

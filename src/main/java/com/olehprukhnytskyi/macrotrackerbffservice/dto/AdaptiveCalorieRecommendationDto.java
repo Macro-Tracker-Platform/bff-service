@@ -1,6 +1,7 @@
 package com.olehprukhnytskyi.macrotrackerbffservice.dto;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,6 +23,12 @@ public class AdaptiveCalorieRecommendationDto {
     private Integer suggestedCalories;
     private Integer calorieDelta;
     private BigDecimal observedKgPerWeek;
+    private BigDecimal targetKgPerWeek;
+    private Integer estimatedMaintenanceCalories;
+    private Integer estimatedWeeksToGoal;
+    private LocalDate estimatedGoalDate;
+    private LocalDate nextCheckInDate;
+    private String status;
     private String explanation;
     private List<String> blockers;
 }

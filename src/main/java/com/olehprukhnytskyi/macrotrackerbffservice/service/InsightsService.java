@@ -23,6 +23,7 @@ import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
@@ -94,7 +95,9 @@ public class InsightsService {
                 .header(CustomHeaders.X_USER_ID, userId.toString())
                 .retrieve()
                 .bodyToMono(JsonNode.class)
-                .map(node -> parseDatedGoals(node, from, to));
+                .map(node -> parseDatedGoals(node, from, to))
+                .onErrorResume(WebClientResponseException.NotFound.class,
+                        ignored -> fetchLegacyGoals(userId, from, to));
         Mono<List<WeightLogDto>> weights = weightWebClient.get()
                 .uri(uriBuilder -> uriBuilder.path("/api/weights/range")
                         .queryParam("startDate", from)
@@ -269,6 +272,14 @@ public class InsightsService {
             result.add(item);
         });
         return result;
+    }
+
+    private Mono<List<DatedGoalDto>> fetchLegacyGoals(Long userId, LocalDate from,
+                                                       LocalDate to) {
+        return userWebClient.get().uri("/api/profile/goal")
+                .header(CustomHeaders.X_USER_ID, userId.toString())
+                .retrieve().bodyToMono(JsonNode.class)
+                .map(node -> parseDatedGoals(node, from, to));
     }
 
     private BigDecimal average(List<DailyNutritionSummaryDto> rows, Metric metric) {
