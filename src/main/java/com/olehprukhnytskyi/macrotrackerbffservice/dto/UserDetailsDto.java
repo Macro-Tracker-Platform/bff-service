@@ -5,6 +5,7 @@ import com.olehprukhnytskyi.util.BodyType;
 import com.olehprukhnytskyi.util.Gender;
 import com.olehprukhnytskyi.util.Goal;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.math.BigDecimal;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -24,6 +25,9 @@ public class UserDetailsDto {
 
     @Schema(description = "User goal weight in kilograms", example = "70")
     private Integer goalWeight;
+
+    @Schema(description = "Desired weekly weight change in kilograms", example = "-0.4")
+    private BigDecimal weeklyWeightChangeKg;
 
     @Schema(description = "User height in centimeters", example = "175")
     private Integer height;

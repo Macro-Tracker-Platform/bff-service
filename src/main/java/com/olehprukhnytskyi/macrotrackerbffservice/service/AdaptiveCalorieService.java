@@ -211,6 +211,9 @@ public class AdaptiveCalorieService {
     }
 
     private BigDecimal targetTrend(UserDetailsDto profile, List<WeightLogDto> ordered) {
+        if (profile.getWeeklyWeightChangeKg() != null) {
+            return profile.getWeeklyWeightChangeKg().setScale(2, RoundingMode.HALF_UP);
+        }
         double currentWeight = ordered.isEmpty() ? profile.getWeight() == null ? 70.0
                 : profile.getWeight() : ordered.getLast().getWeight().doubleValue();
         String goal = profile.getGoal() == null ? "MAINTAIN" : profile.getGoal().name();

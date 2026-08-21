@@ -36,7 +36,8 @@ class AdaptiveCalorieServiceTest {
         UserGoalDto goal = new UserGoalDto();
         goal.setCalories(2000);
         UserDetailsDto profile = UserDetailsDto.builder().goal(Goal.LOSE)
-                .weight(80).goalWeight(70).build();
+                .weight(80).goalWeight(70).weeklyWeightChangeKg(new BigDecimal("-0.60"))
+                .build();
 
         AdaptiveCalorieRecommendationDto result = service.build(
                 summaries, weights, goal, profile, new GoalChangeDto());
@@ -46,6 +47,8 @@ class AdaptiveCalorieServiceTest {
         assertThat(result.getSuggestedCalories()).isEqualTo(1900);
         assertThat(result.getEstimatedMaintenanceCalories()).isGreaterThan(2000);
         assertThat(result.getEstimatedGoalDate()).isAfter(today);
+        assertThat(result.getTargetKgPerWeek()).isEqualByComparingTo("-0.60");
+        assertThat(result.getEstimatedWeeksToGoal()).isEqualTo(17);
         assertThat(result.getExplanation()).contains("2000 → 1900");
     }
 
