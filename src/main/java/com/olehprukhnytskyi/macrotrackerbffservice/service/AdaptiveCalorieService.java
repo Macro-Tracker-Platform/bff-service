@@ -31,6 +31,8 @@ public class AdaptiveCalorieService {
     private static final int REQUIRED_WEIGHT_SPAN = 10;
     private static final int ADJUSTMENT = 100;
     private static final double MAX_PLAUSIBLE_WEEKLY_WEIGHT_CHANGE_KG = 1.5;
+    private static final double MAX_ABSURD_WEEKLY_WEIGHT_CHANGE_KG = 4.0;
+    private static final double MAX_PLAUSIBLE_ADJACENT_WEIGHT_CHANGE_KG = 3.0;
     private static final int MIN_PLAUSIBLE_MAINTENANCE_CALORIES = 1000;
     private static final int MAX_PLAUSIBLE_MAINTENANCE_CALORIES = 6000;
     private final WebClient userWebClient;
@@ -101,8 +103,7 @@ public class AdaptiveCalorieService {
             blockers.add("Keep the current goal for 14 days before adapting it again");
         }
         BigDecimal trend = regressionTrend(ordered);
-        if (trend.abs().compareTo(BigDecimal.valueOf(
-                MAX_PLAUSIBLE_WEEKLY_WEIGHT_CHANGE_KG)) > 0) {
+        if (isImplausibleWeightData(ordered, trend)) {
             blockers.add("Recent weight changes are too volatile for a reliable estimate");
         }
         BigDecimal targetTrend = targetTrend(profile, ordered);
@@ -167,6 +168,21 @@ public class AdaptiveCalorieService {
         }
         double perWeek = denominator == 0 ? 0 : numerator / denominator * 7;
         return BigDecimal.valueOf(perWeek).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private boolean isImplausibleWeightData(List<WeightLogDto> rows, BigDecimal trend) {
+        if (trend.abs().compareTo(BigDecimal.valueOf(MAX_ABSURD_WEEKLY_WEIGHT_CHANGE_KG)) > 0) {
+            return true;
+        }
+        for (int index = 1; index < rows.size(); index++) {
+            BigDecimal previous = rows.get(index - 1).getWeight();
+            BigDecimal current = rows.get(index).getWeight();
+            if (current.subtract(previous).abs().compareTo(
+                    BigDecimal.valueOf(MAX_PLAUSIBLE_ADJACENT_WEIGHT_CHANGE_KG)) > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private int chooseDelta(String goal, BigDecimal trend, BigDecimal targetTrend) {
