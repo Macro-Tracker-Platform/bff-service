@@ -9,6 +9,7 @@ import com.olehprukhnytskyi.util.CustomHeaders;
 import java.time.LocalDate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.CacheControl;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -33,7 +34,7 @@ public class InsightsController {
             String appVersionCode,
             @RequestParam(defaultValue = "30d") String period) {
         return insightsService.getInsights(userId, period, appVersionCode)
-                .map(ResponseEntity::ok);
+                .map(this::noStore);
     }
 
     @GetMapping("/weekly-report")
@@ -44,12 +45,18 @@ public class InsightsController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart) {
         return insightsService.getWeeklyReport(userId, weekStart, appVersionCode)
-                .map(ResponseEntity::ok);
+                .map(this::noStore);
     }
 
     @GetMapping("/adaptive-calories")
     public Mono<ResponseEntity<AdaptiveCalorieRecommendationDto>> adaptiveCalories(
             @RequestHeader(CustomHeaders.X_USER_ID) Long userId) {
-        return adaptiveCalorieService.recommendation(userId).map(ResponseEntity::ok);
+        return adaptiveCalorieService.recommendation(userId).map(this::noStore);
+    }
+
+    private <T> ResponseEntity<T> noStore(T body) {
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(body);
     }
 }
