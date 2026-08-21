@@ -2,122 +2,78 @@ package com.olehprukhnytskyi.macrotrackerbffservice.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.olehprukhnytskyi.macrotrackerbffservice.dto.AdaptiveCalorieRecommendationDto;
-import com.olehprukhnytskyi.macrotrackerbffservice.dto.DailyNutritionSummaryDto;
-import com.olehprukhnytskyi.macrotrackerbffservice.dto.GoalChangeDto;
-import com.olehprukhnytskyi.macrotrackerbffservice.dto.UserDetailsDto;
-import com.olehprukhnytskyi.macrotrackerbffservice.dto.UserGoalDto;
-import com.olehprukhnytskyi.macrotrackerbffservice.dto.WeightLogDto;
-import com.olehprukhnytskyi.util.Goal;
-import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.reactive.function.client.ClientResponse;
+import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
+import reactor.test.StepVerifier;
 
 class AdaptiveCalorieServiceTest {
-    private final AdaptiveCalorieService service = new AdaptiveCalorieService(null, null, null);
+    private AdaptiveCalorieService service;
+    private AtomicReference<String> evaluationPath;
+    private AtomicReference<HttpMethod> evaluationMethod;
 
-    @Test
-    void weeklyCheckInExplainsAdjustmentAndForecast() {
-        LocalDate today = LocalDate.now();
-        List<DailyNutritionSummaryDto> summaries = new ArrayList<>();
-        for (int index = 0; index < 10; index++) {
-            DailyNutritionSummaryDto row = new DailyNutritionSummaryDto();
-            row.setDate(today.minusDays(index));
-            row.setCalories(BigDecimal.valueOf(2000));
-            summaries.add(row);
-        }
-        List<WeightLogDto> weights = List.of(
-                weight(today.minusDays(18), "80.0"),
-                weight(today.minusDays(12), "79.9"),
-                weight(today.minusDays(6), "79.8"),
-                weight(today, "79.7"));
-        UserGoalDto goal = new UserGoalDto();
-        goal.setCalories(2000);
-        UserDetailsDto profile = UserDetailsDto.builder().goal(Goal.LOSE)
-                .weight(80).goalWeight(70).weeklyWeightChangeKg(new BigDecimal("-0.60"))
+    @BeforeEach
+    void setUp() {
+        evaluationPath = new AtomicReference<>();
+        evaluationMethod = new AtomicReference<>();
+        WebClient userClient = WebClient.builder()
+                .exchangeFunction(request -> {
+                    if ("/api/users/me/entitlements".equals(request.url().getPath())) {
+                        return json("{\"features\":{\"adaptiveCalories\":true}}");
+                    }
+                    evaluationPath.set(request.url().getPath());
+                    evaluationMethod.set(request.method());
+                    return json("""
+                            {
+                              "eligible": true,
+                              "currentCalories": 2100,
+                              "suggestedCalories": 2050,
+                              "calorieDelta": -50,
+                              "status": "ADJUSTMENT_RECOMMENDED"
+                            }
+                            """);
+                })
                 .build();
-
-        AdaptiveCalorieRecommendationDto result = service.build(
-                summaries, weights, goal, profile, new GoalChangeDto());
-
-        assertThat(result.isEligible()).isTrue();
-        assertThat(result.getStatus()).isEqualTo("ADJUSTMENT_RECOMMENDED");
-        assertThat(result.getSuggestedCalories()).isEqualTo(1900);
-        assertThat(result.getEstimatedMaintenanceCalories()).isGreaterThan(2000);
-        assertThat(result.getEstimatedGoalDate()).isAfter(today);
-        assertThat(result.getTargetKgPerWeek()).isEqualByComparingTo("-0.60");
-        assertThat(result.getEstimatedWeeksToGoal()).isEqualTo(17);
-        assertThat(result.getExplanation()).contains("2000 → 1900");
+        WebClient intakeClient = clientReturning("""
+                [{"date":"%s","calories":2050}]
+                """.formatted(LocalDate.now()));
+        WebClient weightClient = clientReturning("""
+                [{"date":"%s","weight":80.0}]
+                """.formatted(LocalDate.now()));
+        service = new AdaptiveCalorieService(userClient, intakeClient, weightClient);
     }
 
     @Test
-    void volatileTestWeightDoesNotProduceAbsurdMaintenanceEstimate() {
-        LocalDate today = LocalDate.now();
-        List<DailyNutritionSummaryDto> summaries = new ArrayList<>();
-        for (int index = 0; index < 10; index++) {
-            DailyNutritionSummaryDto row = new DailyNutritionSummaryDto();
-            row.setDate(today.minusDays(index));
-            row.setCalories(BigDecimal.valueOf(2200));
-            summaries.add(row);
-        }
-        List<WeightLogDto> weights = List.of(
-                weight(today.minusDays(18), "100.0"),
-                weight(today.minusDays(12), "88.0"),
-                weight(today.minusDays(6), "74.0"),
-                weight(today, "60.0"));
-        UserGoalDto goal = new UserGoalDto();
-        goal.setCalories(2200);
-        UserDetailsDto profile = UserDetailsDto.builder().goal(Goal.LOSE)
-                .weight(100).goalWeight(75).build();
+    void recommendation_shouldDelegateCalculationToUserService() {
+        StepVerifier.create(service.recommendation(42L))
+                .assertNext(value -> {
+                    assertThat(value.getCalorieDelta()).isEqualTo(-50);
+                    assertThat(value.getStatus()).isEqualTo("ADJUSTMENT_RECOMMENDED");
+                })
+                .verifyComplete();
 
-        AdaptiveCalorieRecommendationDto result = service.build(
-                summaries, weights, goal, profile, new GoalChangeDto());
-
-        assertThat(result.isEligible()).isFalse();
-        assertThat(result.getEstimatedMaintenanceCalories()).isNull();
-        assertThat(result.getBlockers()).anyMatch(value -> value.contains("too volatile"));
+        assertThat(evaluationPath.get())
+                .isEqualTo("/internal/profile/adaptive-calories");
+        assertThat(evaluationMethod.get()).isEqualTo(HttpMethod.POST);
     }
 
-    @Test
-    void fastWeightTrendWithoutLargeSingleJumpCanStillProduceRecommendation() {
-        LocalDate today = LocalDate.now();
-        List<DailyNutritionSummaryDto> summaries = new ArrayList<>();
-        for (int index = 0; index < 10; index++) {
-            DailyNutritionSummaryDto row = new DailyNutritionSummaryDto();
-            row.setDate(today.minusDays(index));
-            row.setCalories(BigDecimal.valueOf(2200));
-            summaries.add(row);
-        }
-        List<WeightLogDto> weights = List.of(
-                weight(today.minusDays(10), "84.0"),
-                weight(today.minusDays(9), "83.6"),
-                weight(today.minusDays(8), "83.2"),
-                weight(today.minusDays(7), "82.8"),
-                weight(today.minusDays(6), "82.4"),
-                weight(today.minusDays(5), "82.0"),
-                weight(today.minusDays(4), "81.6"),
-                weight(today.minusDays(3), "81.2"),
-                weight(today.minusDays(2), "80.8"),
-                weight(today.minusDays(1), "80.4"),
-                weight(today, "80.0"));
-        UserGoalDto goal = new UserGoalDto();
-        goal.setCalories(2200);
-        UserDetailsDto profile = UserDetailsDto.builder().goal(Goal.LOSE)
-                .weight(84).goalWeight(75).build();
-
-        AdaptiveCalorieRecommendationDto result = service.build(
-                summaries, weights, goal, profile, new GoalChangeDto());
-
-        assertThat(result.isEligible()).isTrue();
-        assertThat(result.getObservedKgPerWeek()).isEqualByComparingTo("-2.80");
-        assertThat(result.getSuggestedCalories()).isEqualTo(2300);
-        assertThat(result.getEstimatedMaintenanceCalories()).isNull();
-        assertThat(result.getBlockers()).isEmpty();
+    private static WebClient clientReturning(String body) {
+        return WebClient.builder()
+                .exchangeFunction(request -> json(body))
+                .build();
     }
 
-    private WeightLogDto weight(LocalDate date, String value) {
-        return WeightLogDto.builder().date(date).weight(new BigDecimal(value)).build();
+    private static Mono<ClientResponse> json(String body) {
+        return Mono.just(ClientResponse.create(HttpStatus.OK)
+                .header(HttpHeaders.CONTENT_TYPE, "application/json")
+                .body(body)
+                .build());
     }
 }
