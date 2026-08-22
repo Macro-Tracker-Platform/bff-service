@@ -23,6 +23,7 @@ public class InsightsDto {
     private BigDecimal averageCarbohydrates;
     private int daysWithinCalorieGoal;
     private int daysMeetingProteinGoal;
+    private BigDecimal goalWeight;
     private WeekComparison weekComparison;
     private WeightTrend weightTrend;
     private List<ChartPoint> chart;

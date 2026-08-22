@@ -199,6 +199,8 @@ public class InsightsService {
                 .averageCarbohydrates(average(periodRows, Metric.CARBOHYDRATES))
                 .daysWithinCalorieGoal(countCaloriesInRange(periodRows, data.goals()))
                 .daysMeetingProteinGoal(countProteinGoal(periodRows, data.goals()))
+                .goalWeight(data.profile().getGoalWeight() == null ? null
+                        : BigDecimal.valueOf(data.profile().getGoalWeight()))
                 .weekComparison(buildWeekComparison(to, data.summaries()))
                 .weightTrend(buildWeightTrend(periodWeights))
                 .chart(chart)

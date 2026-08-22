@@ -29,6 +29,5 @@ public class AdaptiveCalorieRecommendationDto {
     private LocalDate estimatedGoalDate;
     private LocalDate nextCheckInDate;
     private String status;
-    private String explanation;
     private List<String> blockers;
 }
