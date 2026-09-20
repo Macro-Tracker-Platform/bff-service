@@ -14,17 +14,32 @@ import reactor.test.StepVerifier;
 
 class DashboardServiceTest {
     private DashboardService dashboardService;
+    private AtomicReference<String> goalPath;
     private AtomicReference<String> intakeVersionHeader;
 
     @BeforeEach
     void setup() {
+        goalPath = new AtomicReference<>();
         intakeVersionHeader = new AtomicReference<>();
         WebClient mockClient = WebClient.builder()
                 .exchangeFunction(request -> {
                     String path = request.url().getPath();
                     if (path.contains("/goal")) {
+                        goalPath.set(path);
                         return Mono.just(ClientResponse.create(HttpStatus.OK)
-                                .body("{\"waterGoalMl\":2500,\"waterGoalMode\":\"AUTO\"}")
+                                .body("""
+                                      {
+                                          "goal": {
+                                              "calories": 2200,
+                                              "protein": 140,
+                                              "fat": 70,
+                                              "carbohydrates": 260,
+                                              "waterGoalMl": 2500,
+                                              "waterGoalMode": "AUTO"
+                                          },
+                                          "source": "SCHEDULE"
+                                      }
+                                      """)
                                 .header(HttpHeaders.CONTENT_TYPE, "application/json")
                                 .build());
                     } else if (path.contains("/intake")) {
@@ -65,8 +80,15 @@ class DashboardServiceTest {
     void getDashboard_shouldAggregateDashboardData() {
         StepVerifier.create(dashboardService.getDashboard(1L, LocalDate.now()))
                 .expectNextMatches(dto -> dto.getGoal().getWaterGoalMl() == 2500
-                        && "AUTO".equals(dto.getGoal().getWaterGoalMode()))
+                        && "AUTO".equals(dto.getGoal().getWaterGoalMode())
+                        && dto.getGoal().getCalories() == 2200
+                        && dto.getGoal().getProtein() == 140
+                        && dto.getGoal().getFat() == 70
+                        && dto.getGoal().getCarbohydrates() == 260)
                 .verifyComplete();
+
+        org.assertj.core.api.Assertions.assertThat(goalPath.get())
+                .isEqualTo("/api/profile/goal/effective");
     }
 
     @Test

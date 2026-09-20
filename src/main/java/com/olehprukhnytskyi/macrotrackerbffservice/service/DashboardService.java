@@ -4,6 +4,7 @@ import com.olehprukhnytskyi.dto.PagedResponse;
 import com.olehprukhnytskyi.exception.ExternalServiceException;
 import com.olehprukhnytskyi.exception.error.CommonErrorCode;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.DashboardDto;
+import com.olehprukhnytskyi.macrotrackerbffservice.dto.EffectiveGoalResponseDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.IntakeDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.UserDetailsDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.UserGoalDto;
@@ -34,7 +35,7 @@ public class DashboardService {
     public Mono<DashboardDto> getDashboard(Long userId, LocalDate date, String appVersionCode) {
         log.debug("Fetching dashboard data for userId={}", userId);
         Mono<UserGoalDto> userGoalMono = userWebClient.get()
-                .uri(uriBuilder -> uriBuilder.path("/api/profile/goal")
+                .uri(uriBuilder -> uriBuilder.path("/api/profile/goal/effective")
                         .queryParam("date", date).build())
                 .headers(headers -> {
                     headers.set(CustomHeaders.X_USER_ID, userId.toString());
@@ -43,7 +44,8 @@ public class DashboardService {
                     }
                 })
                 .retrieve()
-                .bodyToMono(UserGoalDto.class)
+                .bodyToMono(EffectiveGoalResponseDto.class)
+                .map(EffectiveGoalResponseDto::getGoal)
                 .doOnError(e -> log.error("Failed to fetch user goals for userId={}", userId, e))
                 .onErrorMap(e -> new ExternalServiceException(
                         CommonErrorCode.UPSTREAM_SERVICE_UNAVAILABLE,
