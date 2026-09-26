@@ -12,5 +12,6 @@ public class UserEntitlementDto {
         private boolean advancedInsights;
         private boolean adaptiveCalories;
         private boolean trainerExport;
+        private boolean extendedInsightsPeriods;
     }
 }

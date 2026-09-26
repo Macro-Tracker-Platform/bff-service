@@ -86,4 +86,39 @@ class InsightsServiceVersionHeaderTest {
         assertThat(intakeRequest.get().getQuery())
                 .contains("from=" + today.minusDays(6), "to=" + today);
     }
+
+    @Test
+    void freeEntitlementRejectsExtendedInsightsBeforeFetchingData() {
+        ExchangeFunction entitlementExchange = request -> Mono.just(
+                ClientResponse.create(HttpStatus.OK)
+                        .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                        .body("""
+                                {"features":{"advancedInsights":true,
+                                "extendedInsightsPeriods":false}}
+                                """)
+                        .build());
+        WebClient unusedClient = WebClient.builder()
+                .exchangeFunction(request -> Mono.error(
+                        new AssertionError("Downstream data must not be fetched")))
+                .build();
+        InsightsService service = new InsightsService(
+                WebClient.builder().exchangeFunction(entitlementExchange).build(),
+                unusedClient,
+                unusedClient);
+
+        StepVerifier.create(service.getInsights(7L, "30d", "42"))
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(ResponseStatusException.class);
+                    assertThat(((ResponseStatusException) error).getStatusCode())
+                            .isEqualTo(HttpStatus.FORBIDDEN);
+                })
+                .verify();
+        StepVerifier.create(service.getInsights(7L, "90d", "42"))
+                .expectErrorSatisfies(error -> {
+                    assertThat(error).isInstanceOf(ResponseStatusException.class);
+                    assertThat(((ResponseStatusException) error).getStatusCode())
+                            .isEqualTo(HttpStatus.FORBIDDEN);
+                })
+                .verify();
+    }
 }

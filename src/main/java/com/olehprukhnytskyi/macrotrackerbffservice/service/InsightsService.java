@@ -48,7 +48,7 @@ public class InsightsService {
         LocalDate to = LocalDate.now();
         LocalDate from = to.minusDays(days - 1L);
         LocalDate fetchFrom = from.isBefore(to.minusDays(13)) ? from : to.minusDays(13);
-        return ensureAdvancedInsights(userId, appVersionCode)
+        return ensureAdvancedInsights(userId, appVersionCode, days > 7)
                 .then(fetch(userId, fetchFrom, to))
                 .map(data -> buildInsights(period, from, to, data));
     }
@@ -59,12 +59,13 @@ public class InsightsService {
                 ? LocalDate.now().minusDays(6)
                 : requestedStart;
         LocalDate end = start.plusDays(6);
-        return ensureAdvancedInsights(userId, appVersionCode)
+        return ensureAdvancedInsights(userId, appVersionCode, false)
                 .then(fetch(userId, start, end))
                 .map(data -> buildWeeklyReport(start, end, data));
     }
 
-    private Mono<Void> ensureAdvancedInsights(Long userId, String appVersionCode) {
+    private Mono<Void> ensureAdvancedInsights(Long userId, String appVersionCode,
+                                              boolean extendedPeriod) {
         return userWebClient.get()
                 .uri("/api/users/me/entitlements")
                 .headers(headers -> {
@@ -77,10 +78,14 @@ public class InsightsService {
                 .bodyToMono(UserEntitlementDto.class)
                 .flatMap(entitlement -> entitlement.getFeatures() != null
                         && entitlement.getFeatures().isAdvancedInsights()
+                        && (!extendedPeriod
+                        || entitlement.getFeatures().isExtendedInsightsPeriods())
                         ? Mono.empty()
                         : Mono.error(new ResponseStatusException(
                                 HttpStatus.FORBIDDEN,
-                                "MacroTracker Pro is required for advanced insights")));
+                                extendedPeriod
+                                        ? "MacroTracker Pro is required for 30- and 90-day insights"
+                                        : "Advanced insights are not available")));
     }
 
     private Mono<InsightData> fetch(Long userId, LocalDate from, LocalDate to) {
