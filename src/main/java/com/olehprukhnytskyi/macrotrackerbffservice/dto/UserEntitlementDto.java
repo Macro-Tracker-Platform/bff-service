@@ -11,5 +11,6 @@ public class UserEntitlementDto {
     public static class Features {
         private boolean advancedInsights;
         private boolean adaptiveCalories;
+        private boolean trainerExport;
     }
 }

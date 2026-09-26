@@ -6,6 +6,7 @@ import com.olehprukhnytskyi.exception.ExternalServiceException;
 import com.olehprukhnytskyi.exception.error.CommonErrorCode;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.IntakeDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.NutrimentsDto;
+import com.olehprukhnytskyi.macrotrackerbffservice.dto.UserEntitlementDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.WaterLogDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.WeightLogDto;
 import com.olehprukhnytskyi.macrotrackerbffservice.dto.export.ExportFileDto;
@@ -39,8 +40,10 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 @Slf4j
@@ -59,17 +62,35 @@ public class UserDataExportService {
     private static final DateTimeFormatter FILE_NAME_DATE_FORMAT =
             DateTimeFormatter.ISO_LOCAL_DATE;
 
+    private final WebClient userWebClient;
     private final WebClient intakeWebClient;
     private final WebClient weightWebClient;
 
     public Mono<ExportFileDto> export(Long userId, String preset,
                                       LocalDate startDate, LocalDate endDate) {
-        ExportPeriodDto period = resolvePeriod(preset, startDate, endDate);
-        Mono<List<IntakeDto>> intakes = fetchIntakes(userId, period);
-        Mono<List<WeightLogDto>> weights = fetchWeights(userId, period);
-        Mono<List<WaterLogDto>> waterLogs = fetchWaterLogs(userId, period);
-        return Mono.zip(intakes, weights, waterLogs)
-                .map(tuple -> buildExport(period, tuple.getT1(), tuple.getT2(), tuple.getT3()));
+        return ensureTrainerExport(userId).then(Mono.defer(() -> {
+            ExportPeriodDto period = resolvePeriod(preset, startDate, endDate);
+            Mono<List<IntakeDto>> intakes = fetchIntakes(userId, period);
+            Mono<List<WeightLogDto>> weights = fetchWeights(userId, period);
+            Mono<List<WaterLogDto>> waterLogs = fetchWaterLogs(userId, period);
+            return Mono.zip(intakes, weights, waterLogs)
+                    .map(tuple -> buildExport(
+                            period, tuple.getT1(), tuple.getT2(), tuple.getT3()));
+        }));
+    }
+
+    private Mono<Void> ensureTrainerExport(Long userId) {
+        return userWebClient.get()
+                .uri("/api/users/me/entitlements")
+                .header(CustomHeaders.X_USER_ID, userId.toString())
+                .retrieve()
+                .bodyToMono(UserEntitlementDto.class)
+                .flatMap(entitlement -> entitlement.getFeatures() != null
+                        && entitlement.getFeatures().isTrainerExport()
+                        ? Mono.empty()
+                        : Mono.error(new ResponseStatusException(
+                                HttpStatus.FORBIDDEN,
+                                "MacroTracker Pro is required for trainer export")));
     }
 
     private ExportPeriodDto resolvePeriod(String preset, LocalDate startDate, LocalDate endDate) {
